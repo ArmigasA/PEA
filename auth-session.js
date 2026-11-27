@@ -9,7 +9,7 @@ const dropdown=document.getElementById('profile-dropdown');
 if(trigger&&dropdown){
   trigger.addEventListener('click',()=>{dropdown.hidden=!dropdown.hidden;trigger.setAttribute('aria-expanded',String(!dropdown.hidden))});
   document.addEventListener('click',event=>{if(menu&&!menu.contains(event.target)){dropdown.hidden=true;trigger.setAttribute('aria-expanded','false')}});
-  document.getElementById('header-signout')?.addEventListener('click',async()=>{await signOut(auth);location.href='login.html'});
+  document.getElementById('header-signout')?.addEventListener('click',async()=>{await signOut(auth);location.href=new URL('login/',document.baseURI).href});
 }
 document.addEventListener('click',event=>{
   const link=event.target.closest('a[href]');const prefs=JSON.parse(localStorage.getItem('pea-site-settings')||'{}');
@@ -46,3 +46,5 @@ function applySettings(settings){
   document.body.classList.toggle('font-serif',settings.font==='serif');document.body.classList.toggle('font-dyslexic',settings.font==='dyslexic');
   document.body.classList.toggle('vision-assist',settings.vision===true);document.body.classList.toggle('colorblind',settings.colorblind===true);
 }
+
+

@@ -45,4 +45,6 @@ $('claim-link').addEventListener('click',async()=>{
 $('send-verification').addEventListener('click',async()=>{try{await sendEmailVerification(user,{url:location.href});message('Enviamos el enlace de verificación. Revisa tu correo y la carpeta de spam.')}catch(error){message(`No se pudo enviar el correo. Código: ${error.code||'error'}`,true)}});
 $('check-verification').addEventListener('click',async()=>{try{await reload(user);user=auth.currentUser;await getIdToken(user,true);await refresh()}catch(error){message(`No se pudo revisar la verificación. Código: ${error.code||'error'}`,true)}});
 $('copy-invite-code').addEventListener('click',async()=>{const code=$('invite-code-output').textContent.match(/[a-f0-9]{48}/)?.[0];if(!code)return;try{await navigator.clipboard.writeText(code);message('Código copiado. Envíalo de forma privada a tu adulto responsable.')}catch{message(`No se pudo copiar automáticamente. Código: ${code}`)}});
-onAuthStateChanged(auth,authenticated=>{if(!authenticated){location.href='login.html?return=parental.html';return}user=authenticated;refresh()});
+onAuthStateChanged(auth,authenticated=>{if(!authenticated){location.href=new URL('login/?return=parental/',document.baseURI).href;return}user=authenticated;refresh()});
+
+

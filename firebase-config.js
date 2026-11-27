@@ -6,3 +6,5 @@ export const app=initializeApp(firebaseConfig);
 export const auth=getAuth(app);
 export const db=getFirestore(app);
 export const fcmVapidKey=''; // Copia aquí la clave pública de Firebase Console → Cloud Messaging → Web Push certificates.
+
+
