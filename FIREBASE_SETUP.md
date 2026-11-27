@@ -25,3 +25,7 @@ La verificación de correo comprueba acceso a esa dirección, no edad ni identid
 ## Límites del plan gratuito
 
 Cada documento de Firestore admite hasta 1 MiB. Las imágenes se reducen a un máximo de 220.000 caracteres para el avatar y 500.000 para el banner, en un documento aparte. Controla las cuotas de Firestore en Firebase Console si aumenta el uso.
+
+## Acceso de desarrollador
+
+El UID autorizado para el rango Equipo de Desarrollo se valida en profile.js y en las reglas de Firestore. Los nombres ADMIN, AD y Desarrollador quedan reservados por Rules. La contraseña no se guarda en el código: el panel vuelve a autenticar la cuenta mediante Firebase Authentication. Por eso, el texto ingresado debe coincidir con la contraseña actual de esa cuenta; el sitio no contiene ni compara una clave fija llamada `SystemAccess`. La cuenta autorizada debe tener proveedor Correo/Contraseña. La insignia se muestra solo para ese UID con el rango autorizado.

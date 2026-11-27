@@ -5,6 +5,9 @@ import {getMessaging,getToken,deleteToken,isSupported} from 'https://www.gstatic
 
 const $=id=>document.getElementById(id);
 let user=null,profile={},saveTimer,pushToken='';
+const DEVELOPER_UIDS=new Set(['Jj7pIHpuqBNzaRT5i9FSoqRWTnD3']);
+let developerAuthorized=false;
+const isReservedDeveloperName=value=>/^(admin|ad|desarrollador)$/i.test(value.trim());
 let settings={theme:'system',font:'sans',notifications:false,linkCheck:false,colorblind:false,vision:false,visualMode:'standard'};
 const setStatus=(message,error=false)=>{const el=$('profile-save-status');el.textContent=message;el.classList.toggle('is-error',error)};
 
@@ -28,7 +31,9 @@ function fill(){
   $('avatar-initial').textContent=(name[0]||'U').toLocaleUpperCase('es');
   $('bio').value=profile.bio||'';
   $('bio-count').value=$('bio').value.length;
+  $('developer-rank-option').hidden=!DEVELOPER_UIDS.has(user.uid);
   $('rank').value=profile.rank||'';$('parental-dashboard-link').hidden=!['Adulto','Estudiante'].includes(profile.rank);
+  $('developer-badge').hidden=!(DEVELOPER_UIDS.has(user.uid)&&profile.rank==='Equipo de Desarrollo'&&profile.developerBadge===true);
   (profile.socialLinks||[]).forEach((value,index)=>{if(index<3)$(`social-${index+1}`).value=value});
   if(profile.avatarURL){$('avatar-preview').src=profile.avatarURL;$('avatar-preview').hidden=false;$('avatar-initial').hidden=true;const header=$('header-avatar');if(header){header.src=profile.avatarURL;header.hidden=false;$('profile-initial').hidden=true}}
   if(profile.bannerURL)$('profile-cover').style.backgroundImage=`linear-gradient(90deg,#102b40aa,#102b4044),url("${profile.bannerURL}")`;
@@ -50,11 +55,14 @@ async function load(){
     fill();$('profile-loading').hidden=true;$('profile-content').hidden=false;applySettings();
   }catch(error){$('profile-loading').textContent=`No se pudo cargar el perfil. Comprueba Firestore Rules. Código: ${error.code||'error'}`}
 }
-function collectProfile(){return{visibleName:$('visible-name').value.trim(),bio:$('bio').value.trim(),socialLinks:[1,2,3].map(i=>$(`social-${i}`).value.trim()).filter(Boolean),rank:$('rank').value,updatedAt:serverTimestamp()}}
+function collectProfile(){const rank=$('rank').value;return{visibleName:$('visible-name').value.trim(),bio:$('bio').value.trim(),socialLinks:[1,2,3].map(i=>$(`social-${i}`).value.trim()).filter(Boolean),rank,developerBadge:rank==='Equipo de Desarrollo',updatedAt:serverTimestamp()}}
 function queueProfileSave(){
   clearTimeout(saveTimer);
   const name=$('visible-name').value.trim()||'Mi Perfil';
   $('profile-heading').textContent=name;$('welcome-name').textContent=name;$('avatar-initial').textContent=(name[0]||'U').toLocaleUpperCase('es');
+  const reserved=isReservedDeveloperName(name),developerRole=$('rank').value==='Equipo de Desarrollo';
+  $('developer-badge').hidden=!(developerRole&&developerAuthorized);
+  if((reserved||developerRole)&&!developerAuthorized){setStatus('Ese nombre o rango requiere el acceso del Equipo de Desarrollo.',true);return}
   $('parental-dashboard-link').hidden=!['Adulto','Estudiante'].includes($('rank').value);
   $('bio-count').value=$('bio').value.length;setStatus('Guardando cambios…');
   saveTimer=setTimeout(async()=>{
@@ -66,6 +74,14 @@ function queueProfileSave(){
   },700);
 }
 for(const id of ['visible-name','bio','social-1','social-2','social-3','rank']){ $(id).addEventListener('input',queueProfileSave);$(id).addEventListener('change',queueProfileSave); }
+$('visible-name').addEventListener('blur',()=>{if(isReservedDeveloperName($('visible-name').value)&&!developerAuthorized)openDeveloperGate()});
+$('rank').addEventListener('change',()=>{if($('rank').value==='Equipo de Desarrollo'&&!developerAuthorized)openDeveloperGate()});
+function openDeveloperGate(){
+  const allowed=DEVELOPER_UIDS.has(user.uid);$('developer-gate').hidden=false;$('developer-password').value='';$('developer-login-form').hidden=!allowed;$('developer-password').disabled=!allowed;
+  $('developer-gate-status').textContent=allowed?'Confirma tu contraseña de Firebase.':'Esta cuenta de Firebase todavía no está autorizada para el acceso del equipo.';
+}
+$('developer-cancel').addEventListener('click',()=>{$('developer-gate').hidden=true;$('visible-name').value=profile.visibleName||'';$('rank').value=profile.rank||'';$('profile-heading').textContent=profile.visibleName||'Mi Perfil';setStatus('No se aplicaron los cambios reservados.')});
+$('developer-login-form').addEventListener('submit',async event=>{event.preventDefault();if(!DEVELOPER_UIDS.has(user.uid)){openDeveloperGate();return}if(!user.providerData.some(provider=>provider.providerId==='password')){$('developer-gate-status').textContent='Esta verificación requiere una cuenta Firebase con correo y contraseña.';return}try{const credential=EmailAuthProvider.credential(user.email,$('developer-password').value);await reauthenticateWithCredential(user,credential);developerAuthorized=true;$('developer-rank-option').hidden=false;$('developer-gate').hidden=true;if(isReservedDeveloperName($('visible-name').value))$('rank').value='Equipo de Desarrollo';$('developer-badge').hidden=$('rank').value!=='Equipo de Desarrollo';queueProfileSave()}catch(error){$('developer-gate-status').textContent=error.code==='auth/invalid-credential'?'Contraseña incorrecta.':'No se pudo confirmar el acceso. Revisa la cuenta Firebase.'}});
 $('bio').addEventListener('input',()=>{$('bio-count').value=$('bio').value.length});
 function cacheImage(kind,value){if(!value)return;try{localStorage.setItem(`pea-${kind}-${user.uid}`,value)}catch{}}
 function blobToDataUrl(blob){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(reader.error);reader.readAsDataURL(blob)})}

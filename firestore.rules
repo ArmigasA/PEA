@@ -1,6 +1,12 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isDeveloper(uid) {
+      return uid == 'Jj7pIHpuqBNzaRT5i9FSoqRWTnD3';
+    }
+    function isReservedDeveloperName(name) {
+      return name.matches('(?i)^(admin|ad|desarrollador)$');
+    }
     match /users/{userId} {
       allow create: if request.auth != null
         && request.auth.uid == userId
@@ -26,7 +32,7 @@ service cloud.firestore {
       allow read: if true;
       allow create, update: if request.auth != null
         && request.auth.uid == userId
-        && request.resource.data.keys().hasOnly(['visibleName','bio','socialLinks','rank','updatedAt'])
+        && request.resource.data.keys().hasOnly(['visibleName','bio','socialLinks','rank','developerBadge','updatedAt'])
         && request.resource.data.visibleName is string
         && request.resource.data.visibleName.size() >= 1
         && request.resource.data.visibleName.size() <= 50
@@ -34,7 +40,12 @@ service cloud.firestore {
         && request.resource.data.bio.size() <= 300
         && request.resource.data.socialLinks is list
         && request.resource.data.socialLinks.size() <= 3
-        && request.resource.data.rank in ['Usuario','Estudiante','Profesor','Adulto'];
+        && (request.resource.data.rank == 'Equipo de Desarrollo'
+          ? isDeveloper(request.auth.uid) && request.resource.data.developerBadge == true
+          : request.resource.data.rank in ['Usuario','Estudiante','Profesor','Adulto']
+            && request.resource.data.developerBadge == false)
+        && (!isReservedDeveloperName(request.resource.data.visibleName)
+          || (isDeveloper(request.auth.uid) && request.resource.data.rank == 'Equipo de Desarrollo'));
       allow delete: if request.auth != null && request.auth.uid == userId;
 
       match /media/{mediaId} {
