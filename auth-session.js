@@ -1,0 +1,3 @@
+import {auth} from './firebase-config.js';
+import {onAuthStateChanged} from 'https://www.gstatic.com/firebasejs/13.4.0/firebase-auth.js';
+onAuthStateChanged(auth,user=>{if(user)sessionStorage.setItem('pea-authenticated','true');else sessionStorage.removeItem('pea-authenticated');document.documentElement.dataset.authReady='true';document.dispatchEvent(new CustomEvent('pea-auth-state',{detail:{user}}));});
