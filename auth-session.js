@@ -17,6 +17,11 @@ document.addEventListener('click',event=>{
 },{capture:true});
 
 onAuthStateChanged(auth,async user=>{
+  if(user?.isAnonymous){
+    sessionStorage.removeItem('pea-authenticated');document.body.classList.remove('authenticated');
+    if(loginLink)loginLink.hidden=false;if(menu)menu.hidden=true;
+    document.documentElement.dataset.authReady='true';document.dispatchEvent(new CustomEvent('pea-auth-state',{detail:{user:null,anonymous:true}}));return;
+  }
   if(user){
     sessionStorage.setItem('pea-authenticated','true');document.body.classList.add('authenticated');if(loginLink)loginLink.hidden=true;if(menu)menu.hidden=false;
     let name=user.displayName||(user.email?user.email.split('@')[0]:'Usuario');
@@ -34,17 +39,21 @@ onAuthStateChanged(auth,async user=>{
     localStorage.setItem('pea-site-settings',JSON.stringify(settings));applySettings(settings);
     if(settings.language){localStorage.setItem('pea-language',settings.language);document.dispatchEvent(new CustomEvent('pea-language-change',{detail:{language:settings.language}}))}
   }else{
-    sessionStorage.removeItem('pea-authenticated');document.body.classList.remove('authenticated','ancient','console','theme-dark','font-serif','font-dyslexic','vision-assist','colorblind');
+    sessionStorage.removeItem('pea-authenticated');document.body.classList.remove('authenticated','ancient','console','christmas','infantil','kawaii','epilepsy-safe','effects-static','theme-dark','font-serif','font-dyslexic','vision-assist','colorblind');
     if(loginLink)loginLink.hidden=false;if(menu)menu.hidden=true;
   }
   document.documentElement.dataset.authReady='true';document.dispatchEvent(new CustomEvent('pea-auth-state',{detail:{user}}));
 });
 function applySettings(settings){
-  document.body.classList.remove('ancient','console');
+  document.body.classList.remove('ancient','console','christmas','infantil','kawaii','epilepsy-safe');
   if(settings.visualMode&&settings.visualMode!=='standard')document.body.classList.add(settings.visualMode);
+  document.body.classList.toggle('epilepsy-safe',settings.epilepsy===true);
+  document.body.classList.toggle('effects-static',settings.animations===false);
+  const intensity=Math.max(0,Math.min(100,Number(settings.rgbIntensity)||0));document.body.style.setProperty('--rgb-intensity',String(intensity/100));document.body.style.setProperty('--rgb-glow',`${Math.round(intensity*.06)}px`);
   document.body.classList.toggle('theme-dark',settings.theme==='dark'||(settings.theme==='system'&&matchMedia('(prefers-color-scheme: dark)').matches));
   document.body.classList.toggle('font-serif',settings.font==='serif');document.body.classList.toggle('font-dyslexic',settings.font==='dyslexic');
   document.body.classList.toggle('vision-assist',settings.vision===true);document.body.classList.toggle('colorblind',settings.colorblind===true);
+  document.dispatchEvent(new CustomEvent('pea-effects-updated',{detail:{settings}}));
 }
 
 

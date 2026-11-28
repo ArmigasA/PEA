@@ -8,7 +8,7 @@ let user=null,profile={},saveTimer,pushToken='';
 const DEVELOPER_UIDS=new Set(['Jj7pIHpuqBNzaRT5i9FSoqRWTnD3']);
 let developerAuthorized=false;
 const isReservedDeveloperName=value=>/^(admin|ad|desarrollador)$/i.test(value.trim());
-let settings={theme:'system',font:'sans',notifications:false,linkCheck:false,colorblind:false,vision:false,visualMode:'standard'};
+let settings={theme:'system',font:'sans',notifications:false,linkCheck:false,colorblind:false,vision:false,epilepsy:false,visualMode:'standard',snowCount:70,rgbIntensity:45,animations:true};
 const setStatus=(message,error=false)=>{const el=$('profile-save-status');el.textContent=message;el.classList.toggle('is-error',error)};
 
 function applySettings(){
@@ -19,8 +19,12 @@ function applySettings(){
   document.body.classList.toggle('font-dyslexic',settings.font==='dyslexic');
   document.body.classList.toggle('colorblind',settings.colorblind===true);
   document.body.classList.toggle('vision-assist',settings.vision===true);
-  document.body.classList.remove('ancient','console');
+  document.body.classList.remove('ancient','console','christmas','infantil','kawaii','epilepsy-safe');
   if(settings.visualMode&&settings.visualMode!=='standard')document.body.classList.add(settings.visualMode);
+  document.body.classList.toggle('epilepsy-safe',settings.epilepsy===true);
+  document.body.classList.toggle('effects-static',settings.animations===false);
+  const intensity=Math.max(0,Math.min(100,Number(settings.rgbIntensity)||0));document.body.style.setProperty('--rgb-intensity',String(intensity/100));document.body.style.setProperty('--rgb-glow',`${Math.round(intensity*.06)}px`);
+  document.dispatchEvent(new CustomEvent('pea-effects-updated',{detail:{settings}}));
 }
 function fill(){
   const name=profile.visibleName||user.displayName||user.email?.split('@')[0]||'Usuario';
@@ -32,8 +36,12 @@ function fill(){
   $('bio').value=profile.bio||'';
   $('bio-count').value=$('bio').value.length;
   $('developer-rank-option').hidden=!DEVELOPER_UIDS.has(user.uid);
-  $('rank').value=profile.rank||'';$('parental-dashboard-link').hidden=!['Adulto','Estudiante'].includes(profile.rank);
-  $('developer-badge').hidden=!(DEVELOPER_UIDS.has(user.uid)&&profile.rank==='Equipo de Desarrollo'&&profile.developerBadge===true);
+  $('rank').value=profile.rank||'';$('gob-rank-option').hidden=profile.rank!=='GOB';$('parental-dashboard-link').hidden=!['Adulto','Estudiante'].includes(profile.rank);
+  const isDev=profile.rank==='Equipo de Desarrollo'&&profile.developerBadge===true;
+  $('developer-badge').hidden=!(isDev||profile.rank==='GOB');
+  $('developer-badge').innerHTML=profile.rank==='GOB'?'<img src="badge-gob.png" alt="Insignia del rango GOB">GOB':'<img src="badge-equipo-desarrollo.png" alt="Insignia del Equipo de Desarrollo">EQUIPO DE DESARROLLO';
+  $('developer-badge').disabled=!isDev;
+  $('system-tab')?.toggleAttribute('hidden',!(isDev&&sessionStorage.getItem('pea-system-unlocked')==='true'));
   (profile.socialLinks||[]).forEach((value,index)=>{if(index<3)$(`social-${index+1}`).value=value});
   if(profile.avatarURL){$('avatar-preview').src=profile.avatarURL;$('avatar-preview').hidden=false;$('avatar-initial').hidden=true;const header=$('header-avatar');if(header){header.src=profile.avatarURL;header.hidden=false;$('profile-initial').hidden=true}}
   if(profile.bannerURL)$('profile-cover').style.backgroundImage=`linear-gradient(90deg,#102b40aa,#102b4044),url("${profile.bannerURL}")`;
@@ -43,6 +51,11 @@ function fill(){
   $('colorblind-toggle').setAttribute('aria-pressed',String(Boolean(settings.colorblind)));
   $('vision-toggle').setAttribute('aria-pressed',String(Boolean(settings.vision)));
   $('vision-help').hidden=!settings.vision;$('speak-page').hidden=!settings.vision;
+  $('epilepsy-toggle').setAttribute('aria-pressed',String(Boolean(settings.epilepsy)));
+  $('snow-count').value=settings.snowCount??70;$('snow-count-output').value=settings.snowCount??70;
+  $('rgb-intensity').value=settings.rgbIntensity??45;$('rgb-intensity-output').value=settings.rgbIntensity??45;
+  $('animations-toggle').checked=settings.animations!==false;
+  document.querySelectorAll('[data-visual-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.visualMode===(settings.visualMode||'standard'))));
   document.querySelectorAll('[name="visual-mode"]').forEach(r=>r.checked=r.value===(settings.visualMode||'standard'));
 }
 async function load(){
@@ -138,16 +151,23 @@ async function disablePushSubscription(){
   localStorage.removeItem(`pea-push-token-${user.uid}`);pushToken='';$('copy-push-token').hidden=true;$('push-status').textContent='La suscripción push se quitó.';settings.browserPush=false;
 }
 $('copy-push-token').addEventListener('click',async()=>{if(!pushToken)return;try{await navigator.clipboard.writeText(pushToken);$('push-status').textContent='Token de prueba copiado. Úsalo solo en Firebase Console.'}catch{$('push-status').textContent=`Copia este token privado para la prueba: ${pushToken}`}});
-$('effects-open').addEventListener('click',()=>{$('effects-dialog').hidden=false});
-document.querySelectorAll('[name="visual-mode"]').forEach(r=>r.addEventListener('change',async()=>{settings.visualMode=r.value;applySettings();try{await setDoc(doc(db,'users',user.uid),{uid:user.uid,settings,updatedAt:serverTimestamp()},{merge:true});$('account-action-status').textContent='Efectos guardados.'}catch(error){$('account-action-status').textContent=`No se guardaron los efectos. Código: ${error.code||'error'}`}}));
+async function persistEffectSettings(){applySettings();try{await setDoc(doc(db,'users',user.uid),{uid:user.uid,settings,updatedAt:serverTimestamp()},{merge:true});if($('account-action-status'))$('account-action-status').textContent='Preferencias de efectos guardadas.'}catch(error){if($('account-action-status'))$('account-action-status').textContent=`No se guardaron los efectos. Código: ${error.code||'error'}`}}
+document.querySelectorAll('[data-visual-mode]').forEach(button=>button.addEventListener('click',async()=>{settings.visualMode=settings.visualMode===button.dataset.visualMode?'standard':button.dataset.visualMode;await persistEffectSettings()}));
+for(const id of ['snow-count','rgb-intensity'])$(id).addEventListener('input',()=>{const key=id==='snow-count'?'snowCount':'rgbIntensity',out=id==='snow-count'?'snow-count-output':'rgb-intensity-output';settings[key]=Number($(id).value);$(out).value=settings[key];applySettings()});
+for(const id of ['snow-count','rgb-intensity','animations-toggle'])$(id).addEventListener('change',async()=>{if(id==='animations-toggle')settings.animations=$(id).checked;else settings[id==='snow-count'?'snowCount':'rgbIntensity']=Number($(id).value);await persistEffectSettings()});
 $('colorblind-toggle').addEventListener('click',async()=>{settings.colorblind=!settings.colorblind;$('colorblind-toggle').setAttribute('aria-pressed',String(settings.colorblind));await saveSettings()});
 $('vision-toggle').addEventListener('click',async()=>{settings.vision=!settings.vision;$('vision-toggle').setAttribute('aria-pressed',String(settings.vision));$('vision-help').hidden=!settings.vision;$('speak-page').hidden=!settings.vision;await saveSettings()});
+$('epilepsy-toggle').addEventListener('click',async()=>{settings.epilepsy=!settings.epilepsy;await persistEffectSettings()});
 $('speak-page').addEventListener('click',()=>{if(!('speechSynthesis'in window)){setStatus('Este navegador no ofrece lectura de voz.',true);return}speechSynthesis.cancel();speechSynthesis.speak(new SpeechSynthesisUtterance(document.querySelector('main').innerText))});
 $('language-select').addEventListener('change',async event=>{settings.language=event.target.value;localStorage.setItem('pea-language',settings.language);document.dispatchEvent(new CustomEvent('pea-language-change',{detail:{language:settings.language}}));await saveSettings()});
+let badgeTaps=0,badgeTimer;
+$('developer-badge').addEventListener('click',()=>{if(profile.rank!=='Equipo de Desarrollo'||profile.developerBadge!==true)return;badgeTaps++;clearTimeout(badgeTimer);badgeTimer=setTimeout(()=>badgeTaps=0,2500);if(badgeTaps>=3){badgeTaps=0;sessionStorage.setItem('pea-system-unlocked','true');$('system-tab').hidden=false;$('system-tab').focus();setStatus('Sección SYSTEM habilitada para esta sesión.')}});
 async function reauthenticate(){const provider=user.providerData[0]?.providerId;if(provider==='google.com')return reauthenticateWithPopup(user,new GoogleAuthProvider());const password=prompt('Confirma tu contraseña actual para continuar:');if(password===null)throw new Error('cancelled');return reauthenticateWithCredential(user,EmailAuthProvider.credential(user.email,password))}
 $('change-email').addEventListener('click',async()=>{const next=prompt('Ingresa el nuevo correo electrónico:');if(!next)return;try{await reauthenticate();await updateEmail(user,next);await setDoc(doc(db,'users',user.uid),{uid:user.uid,email:next,updatedAt:serverTimestamp()},{merge:true});$('account-action-status').textContent='Correo actualizado.'}catch(error){$('account-action-status').textContent=`No se pudo cambiar el correo. Código: ${error.code||error.message}`}});
 $('change-password').addEventListener('click',async()=>{const next=prompt('Nueva contraseña (6 a 25 caracteres, un número y una mayúscula):');if(!next)return;if(next.length<6||next.length>25||!/[0-9]/.test(next)||!/[A-ZÁÉÍÓÚÜÑ]/.test(next)){$('account-action-status').textContent='La contraseña no cumple los requisitos.';return}try{await reauthenticate();await updatePassword(user,next);$('account-action-status').textContent='Contraseña actualizada.'}catch(error){$('account-action-status').textContent=`No se pudo cambiar la contraseña. Código: ${error.code||error.message}`}});
 $('download-data').addEventListener('click',async()=>{try{const [privateSnap,publicSnap,mediaSnap]=await Promise.all([getDoc(doc(db,'users',user.uid)),getDoc(doc(db,'publicProfiles',user.uid)),getDoc(doc(db,'publicProfiles',user.uid,'media','images'))]);const blob=new Blob([JSON.stringify({privateData:privateSnap.data()||{},publicProfile:publicSnap.data()||{},profileImages:mediaSnap.data()||{}},null,2)],{type:'application/json'});const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download='mis-datos-pea.json';link.click();URL.revokeObjectURL(link.href)}catch(error){$('account-action-status').textContent=`No se pudieron solicitar los datos. Código: ${error.code||'error'}`}});
-$('delete-account').addEventListener('click',async()=>{if(!confirm('¿Seguro que quieres eliminar tu cuenta y perfil? Esta acción no se puede deshacer.'))return;try{await reauthenticate();const [asStudent,asParent,pushTokens]=await Promise.all([getDocs(query(collection(db,'parentLinks'),where('studentUid','==',user.uid))),getDocs(query(collection(db,'parentLinks'),where('parentUid','==',user.uid))),getDocs(collection(db,'users',user.uid,'pushTokens'))]);await Promise.all([...asStudent.docs,...asParent.docs,...pushTokens.docs].map(item=>deleteDoc(item.ref)));await deleteDoc(doc(db,'publicProfiles',user.uid,'media','images'));await deleteDoc(doc(db,'publicProfiles',user.uid));await deleteDoc(doc(db,'users',user.uid));localStorage.removeItem(`pea-avatar-${user.uid}`);localStorage.removeItem(`pea-banner-${user.uid}`);localStorage.removeItem(`pea-push-token-${user.uid}`);await deleteUser(user);location.href='index.html'}catch(error){$('account-action-status').textContent=`No se pudo eliminar la cuenta. Código: ${error.code||error.message}`}});
-$('profile-signout').addEventListener('click',async()=>{await signOut(auth);location.href='login.html'});
-onAuthStateChanged(auth,authenticatedUser=>{if(!authenticatedUser){location.href='login.html?return=perfil.html';return}user=authenticatedUser;load()});
+$('delete-account').addEventListener('click',async()=>{if(!confirm('¿Seguro que quieres eliminar tu cuenta y perfil? Esta acción no se puede deshacer.'))return;try{await reauthenticate();const [asStudent,asParent,pushTokens]=await Promise.all([getDocs(query(collection(db,'parentLinks'),where('studentUid','==',user.uid))),getDocs(query(collection(db,'parentLinks'),where('parentUid','==',user.uid))),getDocs(collection(db,'users',user.uid,'pushTokens'))]);await Promise.all([...asStudent.docs,...asParent.docs,...pushTokens.docs].map(item=>deleteDoc(item.ref)));await deleteDoc(doc(db,'publicProfiles',user.uid,'media','images'));await deleteDoc(doc(db,'publicProfiles',user.uid));await deleteDoc(doc(db,'users',user.uid));localStorage.removeItem(`pea-avatar-${user.uid}`);localStorage.removeItem(`pea-banner-${user.uid}`);localStorage.removeItem(`pea-push-token-${user.uid}`);await deleteUser(user);location.href=new URL('./',document.baseURI).href}catch(error){$('account-action-status').textContent=`No se pudo eliminar la cuenta. Código: ${error.code||error.message}`}});
+$('profile-signout').addEventListener('click',async()=>{await signOut(auth);location.href=new URL('login/',document.baseURI).href});
+onAuthStateChanged(auth,authenticatedUser=>{if(!authenticatedUser||authenticatedUser.isAnonymous){location.href=new URL('login/?return=perfil/',document.baseURI).href;return}user=authenticatedUser;load()});
+
+

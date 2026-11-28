@@ -29,3 +29,11 @@ Cada documento de Firestore admite hasta 1 MiB. Las imágenes se reducen a un m�
 ## Acceso de desarrollador
 
 El UID autorizado para el rango Equipo de Desarrollo se valida en profile.js y en las reglas de Firestore. Los nombres ADMIN, AD y Desarrollador quedan reservados por Rules. La contraseña no se guarda en el código: el panel vuelve a autenticar la cuenta mediante Firebase Authentication. Por eso, el texto ingresado debe coincidir con la contraseña actual de esa cuenta; el sitio no contiene ni compara una clave fija llamada `SystemAccess`. La cuenta autorizada debe tener proveedor Correo/Contraseña. La insignia se muestra solo para ese UID con el rango autorizado.
+
+## Votos privados y acceso SYSTEM
+
+El portal usa Authentication Anónima para que visitantes puedan enviar un voto sin crear una cuenta. En Firebase Console, abre **Authentication → Sign-in method** y habilita **Anonymous**. Los votos se guardan en `votes/{contentId}/ballots/{uid}` sin correo ni perfil público. Cada persona puede cambiar su voto; solo el UID de desarrollo puede leer los documentos y consultar el resumen desde **Perfil → insignia (tres clics) → SYSTEM**.
+
+El editor SYSTEM publica el contenido principal de las páginas en `sitePages/{pageId}`. La página valida y limpia HTML/CSS antes de mostrarlo; no publica scripts ni controladores arbitrarios. `firebase.json` apunta a `firestore.rules`; publica las reglas actualizadas desde la consola o con Firebase CLI. La lectura del contenido es pública, pero las reglas limitan escritura y eliminación al UID de desarrollo.
+
+La preferencia **Epilepsia · reducir movimiento** apaga nieve, partículas, GIF y animaciones del portal. También se respeta `prefers-reduced-motion` del dispositivo.
