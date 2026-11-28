@@ -50,20 +50,31 @@ service cloud.firestore {
         && request.resource.data.socialLinks.size() <= 3
         && (request.resource.data.rank == 'Equipo de Desarrollo'
           ? isDeveloper(request.auth.uid) && request.resource.data.developerBadge == true
-          : request.resource.data.rank == 'GOB'
-            ? isDeveloper(request.auth.uid) && request.resource.data.developerBadge == false
-            : request.resource.data.rank in ['Usuario','Estudiante','Profesor','Adulto']
-              && request.resource.data.developerBadge == false)
+          : request.resource.data.rank in ['Usuario','Estudiante','Profesor','Adulto']
+            && request.resource.data.developerBadge == false)
         && (!isReservedDeveloperName(request.resource.data.visibleName)
           || (isDeveloper(request.auth.uid) && request.resource.data.rank == 'Equipo de Desarrollo'));
       allow delete: if request.auth != null && request.auth.uid == userId;
       allow update: if signedIn()
         && isDevelopmentTeam()
         && request.auth.uid != userId
+        && resource.data.rank in ['Usuario','Estudiante','Profesor','Adulto']
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rank','developerBadge','updatedAt'])
         && request.resource.data.rank == 'GOB'
         && request.resource.data.developerBadge == false
-        && request.resource.data.updatedAt == request.time;
+        && request.resource.data.updatedAt == request.time
+        && getAfter(/databases/$(database)/documents/adminRoles/$(userId)).data.active == true
+        && getAfter(/databases/$(database)/documents/adminRoles/$(userId)).data.previousRank == resource.data.rank;
+      allow update: if signedIn()
+        && isDevelopmentTeam()
+        && request.auth.uid != userId
+        && resource.data.rank == 'GOB'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rank','developerBadge','updatedAt'])
+        && request.resource.data.rank == get(/databases/$(database)/documents/adminRoles/$(userId)).data.previousRank
+        && request.resource.data.developerBadge == false
+        && request.resource.data.updatedAt == request.time
+        && get(/databases/$(database)/documents/adminRoles/$(userId)).data.active == true
+        && getAfter(/databases/$(database)/documents/adminRoles/$(userId)).data.active == false;
       allow update: if signedIn()
         && request.auth.uid == userId
         && resource.data.rank == 'GOB'
@@ -133,16 +144,43 @@ service cloud.firestore {
     match /votes/{contentId}/ballots/{uid} {
       allow create, update: if signedIn()
         && request.auth.uid == uid
-        && contentId in ['update-1-27-11', 'news-project-pea']
+        && contentId in ['update-1-27-11', 'update-1-28-11', 'news-project-pea']
         && request.resource.data.keys().hasOnly(['uid','choice','updatedAt'])
         && request.resource.data.uid == uid
         && request.resource.data.choice is string
-        && (contentId == 'update-1-27-11'
-          ? request.resource.data.choice in ['like','dislike']
-          : request.resource.data.choice in ['like','neutral','dislike'])
+        && (contentId == 'news-project-pea'
+          ? request.resource.data.choice in ['like','neutral','dislike']
+          : request.resource.data.choice in ['like','dislike'])
         && request.resource.data.updatedAt == request.time;
       allow get, list: if isDevelopmentTeam();
       allow delete: if isDevelopmentTeam();
+    }
+    match /adminRoles/{targetUid} {
+      allow get, list: if isDevelopmentTeam();
+      allow create: if isDevelopmentTeam()
+        && request.resource.data.keys().hasOnly(['uid','active','previousRank','grantedBy','grantedAt','updatedAt'])
+        && request.resource.data.uid == targetUid
+        && request.resource.data.active == true
+        && request.resource.data.previousRank in ['Usuario','Estudiante','Profesor','Adulto']
+        && request.resource.data.grantedBy == request.auth.uid
+        && request.resource.data.grantedAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      allow update: if isDevelopmentTeam()
+        && resource.data.active == false
+        && request.resource.data.keys().hasOnly(['uid','active','previousRank','grantedBy','grantedAt','updatedAt'])
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.active == true
+        && request.resource.data.previousRank in ['Usuario','Estudiante','Profesor','Adulto']
+        && request.resource.data.grantedBy == request.auth.uid
+        && request.resource.data.grantedAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      allow update: if isDevelopmentTeam()
+        && resource.data.active == true
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active','updatedAt','revokedBy'])
+        && request.resource.data.active == false
+        && request.resource.data.revokedBy == request.auth.uid
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
     }
     match /sitePages/{pageId} {
       allow read: if true;
@@ -156,6 +194,32 @@ service cloud.firestore {
         && request.resource.data.updatedBy == request.auth.uid
         && request.resource.data.updatedAt == request.time;
       allow delete: if isDevelopmentTeam();
+    }
+    match /sitePageRevisions/{pageId}/versions/{versionId} {
+      allow get, list: if isDevelopmentTeam()
+        && pageId.matches('^(index|actualizacion|biologia|creditos|educar|historia|info|lenguaje|matematicas|noticia-pea|noticias|pea|politica|privacidad|recursos|tecnologia|terminos)$');
+      allow create: if isDevelopmentTeam()
+        && pageId.matches('^(index|actualizacion|biologia|creditos|educar|historia|info|lenguaje|matematicas|noticia-pea|noticias|pea|politica|privacidad|recursos|tecnologia|terminos)$')
+        && request.resource.data.keys().hasOnly(['mainHtml','customCss','snapshotBy','snapshotAt'])
+        && request.resource.data.mainHtml is string
+        && request.resource.data.mainHtml.size() <= 650000
+        && request.resource.data.customCss is string
+        && request.resource.data.customCss.size() <= 16000
+        && request.resource.data.snapshotBy == request.auth.uid
+        && request.resource.data.snapshotAt == request.time;
+      allow update, delete: if false;
+    }
+    match /systemAudit/{entryId} {
+      allow get, list: if isDevelopmentTeam();
+      allow create: if isDevelopmentTeam()
+        && request.resource.data.keys().hasOnly(['actorUid','action','targetUid','pageId','contentId','createdAt'])
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.action in ['publish_page','reset_page','grant_gob','revoke_gob','read_votes']
+        && (!('targetUid' in request.resource.data) || request.resource.data.targetUid is string)
+        && (!('pageId' in request.resource.data) || request.resource.data.pageId is string)
+        && (!('contentId' in request.resource.data) || request.resource.data.contentId in ['update-1-27-11','update-1-28-11','news-project-pea'])
+        && request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
     }
     match /{document=**} { allow read, write: if false; }
   }
